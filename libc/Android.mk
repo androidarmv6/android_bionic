@@ -437,9 +437,6 @@ libc_static_common_src_files += \
 
 endif # mips
 
-ifeq ($(strip $(TARGET_CPU_VARIANT)),)
-$(warning TARGET_CPU_VARIANT is not defined)
-endif
 
 ###########################################################
 ## Add cpu specific source files.
@@ -451,23 +448,13 @@ endif
 ## $(2): Cpu specific source file.
 ###########################################################
 
-define libc-add-cpu-variant-src
-$(if $(filter true,$(_LIBC_ARCH_CPU_VARIANT_HAS_$(1))), \
-	, \
-     $(eval _LIBC_ARCH_CPU_VARIANT_HAS_$(1) := true) \
-     $(eval _LIBC_ARCH_CPU_VARIANT_SRC_FILE.$(1) := $(2)) \
-     $(eval _LIBC_ARCH_CPU_VARIANT_SRC_FILES += $(2)) \
-)
-endef
 
 _LIBC_ARCH_COMMON_SRC_FILES :=
-_LIBC_ARCH_CPU_VARIANT_SRC_FILES :=
 _LIBC_ARCH_STATIC_SRC_FILES :=
 _LIBC_ARCH_DYNAMIC_SRC_FILES :=
 include bionic/libc/arch-$(TARGET_ARCH)/$(TARGET_ARCH).mk
 
 libc_common_src_files += $(_LIBC_ARCH_COMMON_SRC_FILES)
-libc_common_src_files += $(_LIBC_ARCH_CPU_VARIANT_SRC_FILES)
 libc_arch_static_src_files := $(_LIBC_ARCH_STATIC_SRC_FILES)
 libc_arch_dynamic_src_files := $(_LIBC_ARCH_DYNAMIC_SRC_FILES)
 
@@ -506,6 +493,7 @@ endif
 ifeq ($(TARGET_ARCH),arm)
   libc_common_cflags += -DSOFTFLOAT
   libc_common_cflags += -fstrict-aliasing
+  libc_common_cflags += -Wno-error=strict-aliasing
   libc_crt_target_cflags := -mthumb-interwork
   #
   # Define HAVE_ARM_TLS_REGISTER macro to indicate to the C library
