@@ -506,6 +506,7 @@ endif
 ifeq ($(TARGET_ARCH),arm)
   libc_common_cflags += -DSOFTFLOAT
   libc_common_cflags += -fstrict-aliasing
+  libc_common_cflags += -Wno-error=strict-aliasing
   libc_crt_target_cflags := -mthumb-interwork
   #
   # Define HAVE_ARM_TLS_REGISTER macro to indicate to the C library
