@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
  * All rights reserved.
+ * Copyright (C) 2013 The XPerience Project
  *
  * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
