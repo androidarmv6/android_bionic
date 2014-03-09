@@ -77,7 +77,7 @@ extern size_t strlcpy(char* __restrict, const char* __restrict, size_t);
 
 extern size_t strcspn(const char *, const char *) __purefunc;
 extern char*  strpbrk(const char *, const char *) __purefunc;
--extern char*  strsep(char** __restrict, const char* __restrict);
+extern char*  strsep(char** __restrict, const char* __restrict);
 extern size_t strspn(const char *, const char *);
 
 extern char*  strsignal(int  sig);
@@ -126,7 +126,7 @@ char* strncpy(char* __restrict dest, const char* __restrict src, size_t n) {
     if (__builtin_constant_p(n) && (n > bos)) {
         __strncpy_error();
     }
-    return __builtin___strncpy_chk(dest, src, n, bos); (dest, 0));
+    return __builtin___strncpy_chk(dest, src, n, bos);
 }
 
 __BIONIC_FORTIFY_INLINE
