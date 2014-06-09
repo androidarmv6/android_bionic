@@ -109,7 +109,7 @@ void* memcpy(void* __restrict dest, const void* __restrict src, size_t copy_amou
 }
 
 __BIONIC_FORTIFY_INLINE
-void* memmove(void *dest, const void *src, size_t len) {
+void* memmove (void *dest, const void *src, size_t len) {
     return __builtin___memmove_chk(dest, src, len, __builtin_object_size (dest, 0));
 }
 
@@ -140,7 +140,7 @@ char *strncat(char* __restrict dest, const char* __restrict src, size_t n) {
 }
 
 __BIONIC_FORTIFY_INLINE
-void* memset(void *s, int c, size_t n) {
+void* memset (void *s, int c, size_t n) {
     return __builtin___memset_chk(s, c, n, __builtin_object_size (s, 0));
 }
 
@@ -214,10 +214,10 @@ size_t strlen(const char *s) {
 #if !defined(__clang__)
     // Compiler doesn't know destination size. Don't call __strlen_chk
     if (bos == __BIONIC_FORTIFY_UNKNOWN_SIZE) {
-        return __builtin_strlen(s);
+	return __builtin_strlen(s);
     }
 
-    size_t slen = __builtin_strlen(s);
+   size_t slen = __builtin_strlen(s);
     if (__builtin_constant_p(slen)) {
         return slen;
     }
@@ -256,7 +256,7 @@ char* strrchr(const char *s, int c) {
 #if !defined(__clang__)
     // Compiler doesn't know destination size. Don't call __strrchr_chk
     if (bos == __BIONIC_FORTIFY_UNKNOWN_SIZE) {
-        return __builtin_strrchr(s, c);
+       return __builtin_strrchr(s, c);
     }
 
     size_t slen = __builtin_strlen(s);
