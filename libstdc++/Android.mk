@@ -13,7 +13,6 @@ endif
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
-	src/one_time_construction.cpp \
 	src/new.cpp \
 	src/pure_virtual.cpp \
 	src/typeinfo.cpp
@@ -23,6 +22,14 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_CFLAGS := $(libstdc++_cflags)
 
+ifeq ($(TARGET_ARCH_VARIANT),armv6-vfp)
+	LOCAL_SRC_FILES+= \
+		src/one_time_construction.cpp.arm
+else
+	LOCAL_SRC_FILES+= \
+		src/one_time_construction.cpp
+endif
+
 LOCAL_SYSTEM_SHARED_LIBRARIES := libc
 
 include $(BUILD_SHARED_LIBRARY)
@@ -30,10 +37,17 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
-	src/one_time_construction.cpp \
 	src/new.cpp \
 	src/pure_virtual.cpp \
 	src/typeinfo.cpp
+
+ifeq ($(TARGET_ARCH_VARIANT),armv6-vfp)
+	LOCAL_SRC_FILES+= \
+		src/one_time_construction.cpp.arm
+else
+	LOCAL_SRC_FILES+= \
+		src/one_time_construction.cpp
+endif
 
 LOCAL_CFLAGS := $(libstdc++_cflags)
 

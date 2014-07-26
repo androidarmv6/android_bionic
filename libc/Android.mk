@@ -119,7 +119,6 @@ libc_common_src_files := \
 	bionic/sched_cpualloc.c \
 	bionic/sched_cpucount.c \
 	bionic/sched_getcpu.c \
-	bionic/semaphore.c \
 	bionic/send.c \
 	bionic/setegid.c \
 	bionic/seteuid.c \
@@ -140,7 +139,6 @@ libc_common_src_files := \
 	bionic/strntoimax.c \
 	bionic/strntoumax.c \
 	bionic/strtotimeval.c \
-	bionic/system_properties.c \
 	bionic/system_properties_compat.c \
 	bionic/tcgetpgrp.c \
 	bionic/tcsetpgrp.c \
@@ -179,6 +177,16 @@ libc_common_src_files := \
 	netbsd/nameser/ns_netint.c \
 	netbsd/nameser/ns_print.c \
 	netbsd/nameser/ns_samedomain.c \
+
+ifeq ($(TARGET_ARCH_VARIANT),armv6-vfp)
+	libc_common_src_files += \
+		bionic/semaphore.c.arm \
+		bionic/system_properties.c.arm
+else
+	libc_common_src_files += \
+		bionic/semaphore.c \
+		bionic/system_properties.c
+endif
 
 # Fortify implementations of libc functions.
 libc_common_src_files += \
