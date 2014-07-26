@@ -846,6 +846,10 @@ LOCAL_SYSTEM_SHARED_LIBRARIES :=
 # TODO: split out the asflags.
 LOCAL_ASFLAGS := $(LOCAL_CFLAGS)
 
+ifeq ($(TARGET_ARCH_VARIANT),armv6-vfp)
+    LOCAL_ARM_MODE := arm
+endif
+
 include $(BUILD_STATIC_LIBRARY)
 
 
