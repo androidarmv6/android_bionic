@@ -153,7 +153,11 @@ __bionic_cmpxchg(int32_t old_value, int32_t new_value, volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (status), "+m"(*ptr)
             : "r" (ptr), "Ir" (old_value), "r" (new_value)
+#ifdef __thumb2__
             : __ATOMIC_CLOBBERS "cc");
+#else
+            : __ATOMIC_CLOBBERS "memory");
+#endif
     } while (__builtin_expect(status != 0, 0));
     return prev != old_value;
 }
@@ -195,7 +199,11 @@ __bionic_swap(int32_t new_value, volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (status), "+m" (*ptr)
             : "r" (ptr), "r" (new_value)
+#ifdef __thumb2__
             : __ATOMIC_CLOBBERS "cc");
+#else
+            : __ATOMIC_CLOBBERS "memory");
+#endif
     } while (__builtin_expect(status != 0, 0));
     return prev;
 }
@@ -230,7 +238,11 @@ __bionic_atomic_inc(volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (tmp), "=&r" (status), "+m"(*ptr)
             : "r" (ptr)
+#ifdef __thumb2__
             : __ATOMIC_CLOBBERS "cc");
+#else
+            : __ATOMIC_CLOBBERS "memory");
+#endif
     } while (__builtin_expect(status != 0, 0));
     return prev;
 }
@@ -264,7 +276,11 @@ __bionic_atomic_dec(volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (tmp), "=&r" (status), "+m"(*ptr)
             : "r" (ptr)
+#ifdef __thumb2__
             : __ATOMIC_CLOBBERS "cc");
+#else
+            : __ATOMIC_CLOBBERS "memory");
+#endif
     } while (__builtin_expect(status != 0, 0));
     return prev;
 }
