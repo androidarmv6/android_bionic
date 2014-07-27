@@ -29,6 +29,7 @@
 #define _SYS_TLS_H
 
 #include <sys/cdefs.h>
+#include <machine/cpu-features.h>
 
 __BEGIN_DECLS
 
@@ -116,10 +117,17 @@ extern int __set_tls(void *ptr);
   * register, which avoids touching the data cache
   * completely.
   */
+#if __ARM_ARCH__ == 6
+#      define __get_tls() \
+    ({ register unsigned int __val; \
+       asm (".arm\n mrc p15, 0, %0, c13, c0, 3" : "=r"(__val)); \
+       (volatile void*) __val; })
+#else
 #      define __get_tls() \
     ({ register unsigned int __val; \
        asm ("mrc p15, 0, %0, c13, c0, 3" : "=r"(__val)); \
        (volatile void*) __val; })
+#endif
 #    else /* !HAVE_ARM_TLS_REGISTER */
  /* The kernel provides the address of the TLS at a fixed
   * address of the magic page too.
