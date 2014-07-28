@@ -88,45 +88,39 @@ extern int __set_tls(void *ptr);
 
 /* get the TLS */
 #if defined(__arm__)
-/* The standard way to get the TLS is to call a kernel helper
- * function (i.e. a function provided at a fixed address in a
- * "magic page" mapped in all user-space address spaces ), which
- * contains the most appropriate code path for the target device.
- *
- * However, for performance reasons, we're going to use our own
- * machine code for the system's C shared library.
- *
- * We cannot use this optimization in the static version of the
- * C library, because we don't know where the corresponding code
- * is going to run.
- */
-#  ifdef LIBC_STATIC
 
-/* Use the kernel helper in static C library. */
-  typedef volatile void* (__kernel_get_tls_t)(void);
-#    define __get_tls() (*(__kernel_get_tls_t *)0xffff0fe0)()
+#if defined(__thumb__) && !defined(__thumb2__)
+#  define  __ATOMIC_SWITCH_TO_ARM \
+            "adr r3, 5f\n" \
+            "bx  r3\n" \
+            ".align\n" \
+            ".arm\n" \
+        "5:\n"
+/* note: the leading \n below is intentional */
+#  define __ATOMIC_SWITCH_TO_THUMB \
+            "\n" \
+            "adr r3, 6f\n" \
+            "add r3, r3, #1\n" \
+            "bx  r3\n" \
+            ".thumb\n" \
+        "6:\n"
+#  define __ATOMIC_CLOBBERS   "r3"  /* list of clobbered registers */
+#else
+#  define  __ATOMIC_SWITCH_TO_ARM   /* nothing */
+#  define  __ATOMIC_SWITCH_TO_THUMB /* nothing */
+#  define  __ATOMIC_CLOBBERS        /* nothing */
+#endif
 
-#  else /* !LIBC_STATIC */
-/* Use optimized code path.
- * Note that HAVE_ARM_TLS_REGISTER is build-specific
- * (it must match your kernel configuration)
- */
-#    ifdef HAVE_ARM_TLS_REGISTER
- /* We can read the address directly from a coprocessor
-  * register, which avoids touching the data cache
-  * completely.
-  */
 #      define __get_tls() \
     ({ register unsigned int __val; \
-       asm ("mrc p15, 0, %0, c13, c0, 3" : "=r"(__val)); \
+       __asm__ __volatile__ (  \
+             __ATOMIC_SWITCH_TO_ARM \
+              "mrc p15, 0, %0, c13, c0, 3\n" \
+             __ATOMIC_SWITCH_TO_THUMB \
+              : "=r"(__val) \
+              : \
+              : __ATOMIC_CLOBBERS); \
        (volatile void*) __val; })
-#    else /* !HAVE_ARM_TLS_REGISTER */
- /* The kernel provides the address of the TLS at a fixed
-  * address of the magic page too.
-  */
-#      define __get_tls() ( *((volatile void **) 0xffff0ff0) )
-#    endif
-#  endif /* !LIBC_STATIC */
 #elif defined(__mips__)
 # define __get_tls() \
     /* On mips32r1, this goes via a kernel illegal instruction trap that's optimized for v1. */ \
