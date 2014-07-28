@@ -44,106 +44,29 @@
 #  define __ATOMIC_SWITCH_TO_THUMB \
             "\n" \
             "adr r3, 6f\n" \
+            "add r3, r3, #1\n" \
             "bx  r3\n" \
-            ".thumb" \
+            ".thumb\n" \
         "6:\n"
 
-#  define __ATOMIC_CLOBBERS   "r3"  /* list of clobbered registers */
-
 /* Warn the user that ARM mode should really be preferred! */
-#  warning Rebuilding this source file in ARM mode is highly recommended for performance!!
+#warning Rebuilding this source file in ARM mode is highly recommended for performance!!
 
 #else
 #  define  __ATOMIC_SWITCH_TO_ARM   /* nothing */
 #  define  __ATOMIC_SWITCH_TO_THUMB /* nothing */
-#  define  __ATOMIC_CLOBBERS        /* nothing */
 #endif
 
-
-/* Define a full memory barrier, this is only needed if we build the
- * platform for a multi-core device. For the record, using a 'dmb'
- * instruction on a Nexus One device can take up to 180 ns even if
- * it is completely un-necessary on this device.
- *
- * NOTE: This is where the platform and NDK headers atomic headers are
- *        going to diverge. With the NDK, we don't know if the generated
- *        code is going to run on a single or multi-core device, so we
- *        need to be cautious.
- *
- *        Fortunately, we can use the kernel helper function that is
- *        mapped at address 0xffff0fa0 in all user process, and that
- *        provides a device-specific barrier operation.
- *
- *        I.e. on single-core devices, the helper immediately returns,
- *        on multi-core devices, it uses "dmb" or any other means to
- *        perform a full-memory barrier.
- *
- * There are three cases to consider for the platform:
- *
- *    - multi-core ARMv7-A       => use the 'dmb' hardware instruction
- *    - multi-core ARMv6         => use the coprocessor
- *    - single core ARMv5TE/6/7  => do not use any hardware barrier
- */
+__ATOMIC_INLINE__ void __bionic_memory_barrier(void) {
 #if defined(ANDROID_SMP) && ANDROID_SMP == 1
-
-/* Sanity check, multi-core is only supported starting from ARMv6 */
-#  if __ARM_ARCH__ < 6
-#    error ANDROID_SMP should not be set to 1 for an ARM architecture less than 6
-#  endif
-
-#  ifdef __ARM_HAVE_DMB
-/* For ARMv7-A, we can use the 'dmb' instruction directly */
-__ATOMIC_INLINE__ void
-__bionic_memory_barrier(void)
-{
-    /* Note: we always build in ARM or Thumb-2 on ARMv7-A, so don't
-     * bother with __ATOMIC_SWITCH_TO_ARM */
-    __asm__ __volatile__ ( "dmb" : : : "memory" );
-}
-#  else /* !__ARM_HAVE_DMB */
-/* Otherwise, i.e. for multi-core ARMv6, we need to use the coprocessor,
- * which requires the use of a general-purpose register, which is slightly
- * less efficient.
- */
-__ATOMIC_INLINE__ void
-__bionic_memory_barrier(void)
-{
-    __asm__ __volatile__ (
-        __SWITCH_TO_ARM
-        "mcr p15, 0, %0, c7, c10, 5"
-        __SWITCH_TO_THUMB
-        : : "r" (0) : __ATOMIC_CLOBBERS "memory");
-}
-#  endif /* !__ARM_HAVE_DMB */
-#else /* !ANDROID_SMP */
-__ATOMIC_INLINE__ void
-__bionic_memory_barrier(void)
-{
+    __asm__ __volatile__ ( "dmb ish" : : : "memory" );
+#else
     /* A simple compiler barrier */
     __asm__ __volatile__ ( "" : : : "memory" );
+#endif
 }
-#endif /* !ANDROID_SMP */
 
-/* LDREX/STREX routines broken on ARMv6 */
-#  if __ARM_ARCH__ == 6
-#    define BROKEN_REX
-#  endif
-
-/* Compare-and-swap, without any explicit barriers. Note that this functions
- * returns 0 on success, and 1 on failure. The opposite convention is typically
- * used on other platforms.
- *
- * There are two cases to consider:
- *
- *     - ARMv6+  => use LDREX/STREX instructions
- *     - < ARMv6 => use kernel helper function mapped at 0xffff0fc0
- *
- * LDREX/STREX are only available starting from ARMv6
- */
-#if defined(__ARM_HAVE_LDREX_STREX) && !defined(BROKEN_REX)
-__ATOMIC_INLINE__ int
-__bionic_cmpxchg(int32_t old_value, int32_t new_value, volatile int32_t* ptr)
-{
+__ATOMIC_INLINE__ int __bionic_cmpxchg(int32_t old_value, int32_t new_value, volatile int32_t* ptr) {
     int32_t prev, status;
     do {
         __asm__ __volatile__ (
@@ -158,39 +81,17 @@ __bionic_cmpxchg(int32_t old_value, int32_t new_value, volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (status), "+m"(*ptr)
             : "r" (ptr), "Ir" (old_value), "r" (new_value)
-            : __ATOMIC_CLOBBERS "cc");
+            :
+#if defined(__thumb__) && !defined(__thumb2__)
+            "r3",
+#endif
+            "cc");
     } while (__builtin_expect(status != 0, 0));
     return prev != old_value;
 }
-#  else /* !__ARM_HAVE_LDREX_STREX */
 
-/* Use the handy kernel helper function mapped at 0xffff0fc0 */
-typedef int (kernel_cmpxchg)(int32_t, int32_t, volatile int32_t *);
-
-__ATOMIC_INLINE__ int
-__kernel_cmpxchg(int32_t old_value, int32_t new_value, volatile int32_t* ptr)
-{
-    /* Note: the kernel function returns 0 on success too */
-    return (*(kernel_cmpxchg *)0xffff0fc0)(old_value, new_value, ptr);
-}
-
-__ATOMIC_INLINE__ int
-__bionic_cmpxchg(int32_t old_value, int32_t new_value, volatile int32_t* ptr)
-{
-    return __kernel_cmpxchg(old_value, new_value, ptr);
-}
-#endif /* !__ARM_HAVE_LDREX_STREX */
-
-/* Swap operation, without any explicit barriers.
- * There are again two similar cases to consider:
- *
- *   ARMv6+ => use LDREX/STREX
- *   < ARMv6 => use SWP instead.
- */
-#if defined(__ARM_HAVE_LDREX_STREX) && !defined(BROKEN_REX)
-__ATOMIC_INLINE__ int32_t
-__bionic_swap(int32_t new_value, volatile int32_t* ptr)
-{
+/* Swap, without any explicit barriers. */
+__ATOMIC_INLINE__ int32_t __bionic_swap(int32_t new_value, volatile int32_t* ptr) {
     int32_t prev, status;
     do {
         __asm__ __volatile__ (
@@ -200,65 +101,17 @@ __bionic_swap(int32_t new_value, volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (status), "+m" (*ptr)
             : "r" (ptr), "r" (new_value)
-            : __ATOMIC_CLOBBERS "cc");
-    } while (__builtin_expect(status != 0, 0));
-    return prev;
-}
-#else /* !__ARM_HAVE_LDREX_STREX */
-__ATOMIC_INLINE__ int32_t
-__bionic_swap(int32_t new_value, volatile int32_t* ptr)
-{
-    int32_t prev;
-    /* NOTE: SWP is available in Thumb-1 too */
-    __asm__ __volatile__ ("swp %0, %2, [%3]"
-                          : "=&r" (prev), "+m" (*ptr)
-                          : "r" (new_value), "r" (ptr)
-                          : "cc");
-    return prev;
-}
-#endif /* !__ARM_HAVE_LDREX_STREX */
-
-/* Atomic increment - without any barriers
- * This returns the old value
- */
-#if defined(__ARM_HAVE_LDREX_STREX) && !defined(BROKEN_REX)
-__ATOMIC_INLINE__ int32_t
-__bionic_atomic_inc(volatile int32_t* ptr)
-{
-    int32_t prev, tmp, status;
-    do {
-        __asm__ __volatile__ (
-            __ATOMIC_SWITCH_TO_ARM
-            "ldrex %0, [%4]\n"
-            "add %1, %0, #1\n"
-            "strex %2, %1, [%4]"
-            __ATOMIC_SWITCH_TO_THUMB
-            : "=&r" (prev), "=&r" (tmp), "=&r" (status), "+m"(*ptr)
-            : "r" (ptr)
-            : __ATOMIC_CLOBBERS "cc");
-    } while (__builtin_expect(status != 0, 0));
-    return prev;
-}
-#else
-__ATOMIC_INLINE__ int32_t
-__bionic_atomic_inc(volatile int32_t* ptr)
-{
-    int32_t  prev, status;
-    do {
-        prev = *ptr;
-        status = __kernel_cmpxchg(prev, prev+1, ptr);
-    } while (__builtin_expect(status != 0, 0));
-    return prev;
-}
+            :
+#if defined(__thumb__) && !defined(__thumb2__)
+            "r3",
 #endif
+            "cc");
+    } while (__builtin_expect(status != 0, 0));
+    return prev;
+}
 
-/* Atomic decrement - without any barriers
- * This returns the old value.
- */
-#if defined(__ARM_HAVE_LDREX_STREX) && !defined(BROKEN_REX)
-__ATOMIC_INLINE__ int32_t
-__bionic_atomic_dec(volatile int32_t* ptr)
-{
+/* Atomic decrement, without explicit barriers */
+__ATOMIC_INLINE__ int32_t __bionic_atomic_dec(volatile int32_t* ptr) {
     int32_t prev, tmp, status;
     do {
         __asm__ __volatile__ (
@@ -269,21 +122,13 @@ __bionic_atomic_dec(volatile int32_t* ptr)
             __ATOMIC_SWITCH_TO_THUMB
             : "=&r" (prev), "=&r" (tmp), "=&r" (status), "+m"(*ptr)
             : "r" (ptr)
-            : __ATOMIC_CLOBBERS "cc");
-    } while (__builtin_expect(status != 0, 0));
-    return prev;
-}
-#else
-__ATOMIC_INLINE__ int32_t
-__bionic_atomic_dec(volatile int32_t* ptr)
-{
-    int32_t  prev, status;
-    do {
-        prev = *ptr;
-        status = __kernel_cmpxchg(prev, prev-1, ptr);
-    } while (__builtin_expect(status != 0, 0));
-    return prev;
-}
+            :
+#if defined(__thumb__) && !defined(__thumb2__)
+            "r3",
 #endif
+            "cc");
+    } while (__builtin_expect(status != 0, 0));
+    return prev;
+}
 
 #endif /* SYS_ATOMICS_ARM_H */
